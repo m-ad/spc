@@ -1,10 +1,12 @@
 # spc
 
-[![Build Status](https://travis-ci.org/rohanisaac/spc.svg?branch=master)](https://travis-ci.org/rohanisaac/spc)
+![Release version](https://img.shields.io/github/v/release/m-ad/spc?label=release)
 
-A module for working with .SPC files in Python. SPC is a binary data format to store a variety of spectral data, developed by Galactic Industries Corporation in the '90s. Popularly used Thermo Fisher/Scientific software GRAMS/AI. Also used by others including Ocean Optics, Jobin Yvon Horiba. Can store a variety of spectrum including FT-IR, UV-VIS, X-ray Diffraction, Mass Spectroscopy, NMR, Raman and Fluorescence spectra.
+The **[SPC file format](https://en.wikipedia.org/wiki/SPC_file_format)** is a file format for storing spectroscopic data.
 
-The SPC file format can store either single or multiple y-values, and the x-values can either be given explicitly or even spaced x-values can be generated based on initial and final points as well as number of points. In addition the format can store various log data and parameters, as well as various information such as axis labels and scan type.
+It can store either single or multiple y-values, and the x-values can either be given explicitly or even spaced x-values can be generated based on initial and final points as well as number of points. In addition the format can store various log data and parameters, as well as various information such as axis labels and scan type.
+
+Note: This is a minimally updated version of Rohan Isaac's original [spc](https://github.com/rohanisaac/spc) package. The original package is no longer easy to install in a modern environments (e.g. managed by `uv`). This repo fixes these issues by using a `pyproject.toml` file and by providing pre-built wheels (see [Releases](https://github.com/m-ad/spc/releases) section).
 
 ## Features
 
@@ -16,19 +18,20 @@ The SPC file format can store either single or multiple y-values, and the x-valu
 
 ## Installation
 
-### Requirements
+You can install pre-build wheels from the [Release](https://github.com/m-ad/spc/releases) section.
 
+Example quickstart with `uvx`:
+
+```console
+uvx --with https://github.com/m-ad/spc/releases/download/v0.4.1/spc-0.4.1-py3-none-any.whl python
 ```
-python2.7+
-numpy
-matplotlib (optional, for plotting)
-```
 
-Download zip and extract or clone repository. From the resulting folder run
+This will launch an interactive python session with `spc` installed.
 
-```bash
-$ cd ~/Downloads/spc-master/
-$ python setup.py install
+In a project, use `uv add` instead:
+
+```console
+uv add https://github.com/m-ad/spc/releases/download/v0.4.1/spc-0.4.1-py3-none-any.whl
 ```
 
 ## Usage
@@ -48,56 +51,56 @@ Note the format string outputed refers to where data is stored the object, which
 
 ### Examples
 
-Format string | Meaning
-------------- | --------------------------------------------------------------------
-x-y(3)        | one global x-data series, 3 corresponding y-data series
--xy(4)        | four subfiles with individual x and y data series
-gx-y(10)      | single global x-data (generated), and 10 corresponding y-data series
+| Format string | Meaning                                                              |
+|---------------|----------------------------------------------------------------------|
+| x-y(3)        | one global x-data series, 3 corresponding y-data series              |
+| -xy(4)        | four subfiles with individual x and y data series                    |
+| gx-y(10)      | single global x-data (generated), and 10 corresponding y-data series |
 
 ### Accessing data
 
 The object generated is populated with all the data and metadata from the file. The data can be manully accessed using the entry in the table corresponding to the format string outputted.
 
-format string | x-values                  | y-values
-------------- | ------------------------- | -------------------------
--xy(n)        | f.sub[0].x ... f.sub[n].x | f.sub[0].y ... f.sub[n].y
-x-y(n)        | f.x                       | f.sub[0].y ... f.sub[n].y
-gx-y(n)       | f.x (generated)           | f.sub[0].y ... f.sub[n].y
+| format string | x-values                  | y-values                  |
+|---------------|---------------------------|---------------------------|
+| -xy(n)        | f.sub[0].x ... f.sub[n].x | f.sub[0].y ... f.sub[n].y |
+| x-y(n)        | f.x                       | f.sub[0].y ... f.sub[n].y |
+| gx-y(n)       | f.x (generated)           | f.sub[0].y ... f.sub[n].y |
 
 Depending on the information stored in the file, there are a number of metadata fields that may be populated. Some commonly used fields are
 
-metadata            | variable
-------------------- | -----------
-x-label             | f.xlabel
-y-label             | f.ylabel
-z-label             | f.zlabel
-Comment (formatted) | f.cmnt
-Comment (raw)       | f.fcmnt
-Experiment type     | f.exp_type
-Log dictionary      | f.log_dict
-Log (remaining)     | f.log_other
+| metadata            | variable    |
+|---------------------|-------------|
+| x-label             | f.xlabel    |
+| y-label             | f.ylabel    |
+| z-label             | f.zlabel    |
+| Comment (formatted) | f.cmnt      |
+| Comment (raw)       | f.fcmnt     |
+| Experiment type     | f.exp_type  |
+| Log dictionary      | f.log_dict  |
+| Log (remaining)     | f.log_other |
 
 To get a full list of data/metadata stored in the object, you can run `object.__dict__` on the file and subFile objects.
 
 ### Functions
 
-Functions      | Description
--------------- | -------------------------------------
-f.data_txt()   | Outputs data to stdout
-f.debug_info() | Human readable metadata for debugging
-f.plot()       | Plots data using matplotlib
-f.write_file() | Writes data to text file
+| Functions      | Description                           |
+|----------------|---------------------------------------|
+| f.data_txt()   | Outputs data to stdout                |
+| f.debug_info() | Human readable metadata for debugging |
+| f.plot()       | Plots data using matplotlib           |
+| f.write_file() | Writes data to text file              |
 
 ### File versions supported
 
 File versions are given by the second bit in the file, `fversn` in an SPC object. Currently the library supports the following `fversn` bytes.
 
-fversn | Description      | Support      | Notes
------- | ---------------- | ------------ | ----------------------------------------------------------------
-0x4B   | New format (LSB) | Good         | z-values are not accounted for in data_txt() and plot() commands
-0x4C   | New format (MSB) | None         | need sample file to test
-0x4D   | Old format       | Good         |
-0xCF   | SHIMADZU format  | Very limited | no metadata support, only tested on one file, no specifications
+| fversn | Description      | Support      | Notes                                                            |
+|--------|------------------|--------------|------------------------------------------------------------------|
+| 0x4B   | New format (LSB) | Good         | z-values are not accounted for in data_txt() and plot() commands |
+| 0x4C   | New format (MSB) | None         | need sample file to test                                         |
+| 0x4D   | Old format       | Good         |
+| 0xCF   | SHIMADZU format  | Very limited | no metadata support, only tested on one file, no specifications  |
 
 ## File converter
 
@@ -158,7 +161,3 @@ Uses Tk which is generally included as part of Python standard library.
 - ~~Fix exponent in 16 bit format~~
 - Add labels to ~~plots and~~ text output
 - Merge both subFile classes, they are pretty similar
-
-## References
-
-[1] "Thermo Scientific SPC File Format." Thermo Fisher Scientific, Web. 20 July 2014\. <http://ftirsearch.com/features/converters/SPCFileFormat.htm>.
