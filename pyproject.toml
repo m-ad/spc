@@ -21,3 +21,13 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]
+
+
+[tool.pytest.ini_options]
+python_functions = "test_*"
+testpaths = "tests"
