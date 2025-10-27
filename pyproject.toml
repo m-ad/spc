@@ -10,23 +10,17 @@ dependencies = [
 ]
 requires-python = ">=3.8"
 authors = [
-  {name = "Rohan Isaac", email = "rohan_isaac@yahoo.com"},
+    { name = "Rohan Isaac", email = "rohan_isaac@yahoo.com" },
+    { name = "Michael Adams", email = "gitlab@mmmad.de" }
 ]
 description = "Module for reading, exploring and converting *.spc spectroscopic binary data in Python."
-classifiers = [
-  "License :: OSI Approved :: GNU General Public License v3 only (GPLv3)",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+plot = ["matplotlib"]
 
 [dependency-groups]
-dev = [
-    "pytest>=8.3.5",
-]
-
+dev = ["pytest"]
 
 [tool.pytest.ini_options]
 python_functions = "test_*"
