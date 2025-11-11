@@ -161,3 +161,20 @@ Uses Tk which is generally included as part of Python standard library.
 - ~~Fix exponent in 16 bit format~~
 - Add labels to ~~plots and~~ text output
 - Merge both subFile classes, they are pretty similar
+
+### Legacy (0x4D) Old Format Handling
+
+Old-format (0x4D) SPC files store 32-bit y-values in a non-standard byte order and may omit explicit subfile counts and x-value arrays. This library implements:
+
+1. Automatic Subfile Discovery: Iteratively reads subheaders until they can no longer be parsed. If no valid subheaders are found, a synthetic subfile is constructed from the main header and remaining bytes.
+2. Unsigned Reconstruction + Two's Complement: Reassembles each 4-byte y-value using the documented byte swap pattern (bytes 2,1,4,3 order) then converts to signed 32-bit via two's complement for negative intensities.
+3. Exponent Scaling: Applies scaling factor 2**(exp - 32) consistent with the new-format 32-bit integer behavior; falls back to global exponent when local subfile exponent is invalid.
+4. Generated X Values: If no explicit x-values are present, evenly spaced x-values are generated from first/last and point count.
+5. Fallback Synthesis: When parsing yields zero subfiles, the code infers point count from header (`onpts`) or remaining byte length and attempts a single subfile reconstruction.
+
+Limitations:
+- The old header date/time fields are not fully decoded (year bits and z-type interleaving unresolved).
+- Multi-subfile detection relies on contiguous layout; truncated files may yield fewer subfiles.
+- MSB new format (0x4C) remains unimplemented and is distinct from old (0x4D) handling.
+
+If you encounter an old-format file that fails to parse, please open an issue with a sample file excerpt (first 512 bytes) for improvement.

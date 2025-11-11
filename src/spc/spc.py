@@ -5,12 +5,14 @@ file
 author: Rohan Isaac
 """
 
-from __future__ import division, absolute_import, unicode_literals, print_function
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import struct
+
 import numpy as np
 
+from .global_fun import flag_bits, read_subheader
 from .sub import subFile, subFileOld
-from .global_fun import read_subheader, flag_bits
 
 
 class File:
@@ -57,59 +59,62 @@ class File:
 
         self.length = len(content)
         # extract first two bytes to determine file type version
-        self.ftflg, self.fversn = struct.unpack('<cc'.encode('utf8'), content[:2])
+        self.ftflg, self.fversn = struct.unpack("<cc".encode("utf8"), content[:2])
         # --------------------------------------------
         # NEW FORMAT (LSB)
         # --------------------------------------------
-        if self.fversn == b'\x4b':
+        if self.fversn == b"\x4b":
             # format: new LSB 1st
             # -------------
             # unpack header
             # -------------
             # use little-endian format with standard sizes
             # use naming scheme in SPC.H header file
-            self.ftflg, \
-                self.fversn, \
-                self.fexper, \
-                self.fexp, \
-                self.fnpts, \
-                self.ffirst, \
-                self.flast, \
-                self.fnsub, \
-                self.fxtype, \
-                self.fytype, \
-                self.fztype, \
-                self.fpost, \
-                self.fdate, \
-                self.fres, \
-                self.fsource, \
-                self.fpeakpt, \
-                self.fspare, \
-                self.fcmnt, \
-                self.fcatxt, \
-                self.flogoff, \
-                self.fmods, \
-                self.fprocs, \
-                self.flevel, \
-                self.fsampin, \
-                self.ffactor, \
-                self.fmethod, \
-                self.fzinc, \
-                self.fwplanes, \
-                self.fwinc, \
-                self.fwtype, \
-                self.freserv \
-                = struct.unpack(self.head_str.encode('utf8'), content[:self.head_siz])
+            (
+                self.ftflg,
+                self.fversn,
+                self.fexper,
+                self.fexp,
+                self.fnpts,
+                self.ffirst,
+                self.flast,
+                self.fnsub,
+                self.fxtype,
+                self.fytype,
+                self.fztype,
+                self.fpost,
+                self.fdate,
+                self.fres,
+                self.fsource,
+                self.fpeakpt,
+                self.fspare,
+                self.fcmnt,
+                self.fcatxt,
+                self.flogoff,
+                self.fmods,
+                self.fprocs,
+                self.flevel,
+                self.fsampin,
+                self.ffactor,
+                self.fmethod,
+                self.fzinc,
+                self.fwplanes,
+                self.fwinc,
+                self.fwtype,
+                self.freserv,
+            ) = struct.unpack(self.head_str.encode("utf8"), content[: self.head_siz])
 
             # Flag bits
-            self.tsprec, \
-                self.tcgram, \
-                self.tmulti, \
-                self.trandm, \
-                self.tordrd, \
-                self.talabs, \
-                self.txyxys, \
-                self.txvals = flag_bits(self.ftflg)[::-1]
+            (
+                self.tsprec,
+                self.tcgram,
+                self.tmulti,
+                self.trandm,
+                self.tordrd,
+                self.talabs,
+                self.txyxys,
+                self.txvals,
+            ) = flag_bits(self.ftflg)[::-1]
 
             # fix data types if necessary
             self.fnpts = int(self.fnpts)  # of points should be int
@@ -138,7 +143,7 @@ class File:
             # null terminated string, replace null characters with spaces
             # split and join to remove multiple spaces
             try:
-                self.cmnt = ' '.join((self.fcmnt.replace('\x00', ' ')).split())
+                self.cmnt = " ".join((self.fcmnt.replace("\x00", " ")).split())
             except:
                 self.cmnt = self.fcmnt
 
@@ -148,15 +153,15 @@ class File:
 
             if self.txyxys:
                 # x values are given
-                self.dat_fmt = '-xy'
+                self.dat_fmt = "-xy"
             elif self.txvals:
                 # only one subfile, which contains the x data
-                self.dat_fmt = 'x-y'
+                self.dat_fmt = "x-y"
             else:
                 # no x values are given, but they can be generated
-                self.dat_fmt = 'gx-y'
+                self.dat_fmt = "gx-y"
 
-            print('{}({})'.format(self.dat_fmt, self.fnsub))
+            print("{}({})".format(self.dat_fmt, self.fnsub))
 
             sub_pos = self.head_siz
 
@@ -167,9 +172,13 @@ class File:
                     x_dat_pos = self.head_siz
                     x_dat_end = self.head_siz + (4 * self.fnpts)
                     self.x = np.array(
-                        [struct.unpack_from(
-                            'f', content[x_dat_pos:x_dat_end], 4 * i)[0]
-                            for i in range(0, self.fnpts)])
+                        [
+                            struct.unpack_from(
+                                "f", content[x_dat_pos:x_dat_end], 4 * i
+                            )[0]
+                            for i in range(0, self.fnpts)
+                        ]
+                    )
                     sub_pos = x_dat_end
                 else:
                     # otherwise generate them
@@ -179,14 +188,25 @@ class File:
             self.sub = []
 
             # if subfile directory is given
-            if self.dat_fmt == '-xy' and self.fnpts > 0:
+            if self.dat_fmt == "-xy" and self.fnpts > 0:
                 self.directory = True
                 # loop over entries in directory
                 for i in range(0, self.fnsub):
                     ssfposn, ssfsize, ssftime = struct.unpack(
-                        '<iif'.encode('utf8'), content[self.fnpts + (i * 12):self.fnpts + ((i + 1) * 12)])
+                        "<iif".encode("utf8"),
+                        content[self.fnpts + (i * 12) : self.fnpts + ((i + 1) * 12)],
+                    )
                     # add sufile, load defaults for npts and exp
-                    self.sub.append(subFile(content[ssfposn:ssfposn + ssfsize], 0, 0, True, self.tsprec, self.tmulti))
+                    self.sub.append(
+                        subFile(
+                            content[ssfposn : ssfposn + ssfsize],
+                            0,
+                            0,
+                            True,
+                            self.tsprec,
+                            self.tmulti,
+                        )
+                    )
 
             else:
                 # don't have directory, for each subfile
@@ -194,7 +214,7 @@ class File:
                     # figure out its size
                     if self.txyxys:
                         # use points in subfile
-                        subhead_lst = read_subheader(content[sub_pos:(sub_pos + 32)])
+                        subhead_lst = read_subheader(content[sub_pos : (sub_pos + 32)])
                         pts = subhead_lst[6]
                         # 4 bytes each for x and y, and 32 for subheader
                         dat_siz = (8 * pts) + 32
@@ -205,8 +225,16 @@ class File:
 
                     sub_end = sub_pos + dat_siz
                     # read into object, add to list
-                    self.sub.append(subFile(content[sub_pos:sub_end],
-                                            self.fnpts, self.fexp, self.txyxys, self.tsprec, self.tmulti))
+                    self.sub.append(
+                        subFile(
+                            content[sub_pos:sub_end],
+                            self.fnpts,
+                            self.fexp,
+                            self.txyxys,
+                            self.tsprec,
+                            self.tmulti,
+                        )
+                    )
                     # update positions
                     sub_pos = sub_end
 
@@ -214,28 +242,32 @@ class File:
             # flog offset to log data offset not zero (bytes)
             if self.flogoff:
                 log_head_end = self.flogoff + self.log_siz
-                self.logsizd, \
-                    self.logsizm, \
-                    self.logtxto, \
-                    self.logbins, \
-                    self.logdsks, \
-                    self.logspar \
-                    = struct.unpack(self.logstc_str.encode('utf8'),
-                                    content[self.flogoff:log_head_end])
+                (
+                    self.logsizd,
+                    self.logsizm,
+                    self.logtxto,
+                    self.logbins,
+                    self.logdsks,
+                    self.logspar,
+                ) = struct.unpack(
+                    self.logstc_str.encode("utf8"), content[self.flogoff : log_head_end]
+                )
                 log_pos = self.flogoff + self.logtxto
 
                 log_end_pos = log_pos + self.logsizd
 
                 # line endings: get rid of any '\r' and then split on '\n'
-                self.log_content = content[log_pos:log_end_pos].replace(b'\r', b'').split(b'\n')
+                self.log_content = (
+                    content[log_pos:log_end_pos].replace(b"\r", b"").split(b"\n")
+                )
 
                 # split log data into dictionary based on =
                 self.log_dict = dict()
                 self.log_other = []  # put the rest into a list
                 for x in self.log_content:
-                    if x.find(b'=') >= 0:
+                    if x.find(b"=") >= 0:
                         # stop it from breaking if there is more than 1 =
-                        key, value = x.split(b'=')[:2]
+                        key, value = x.split(b"=")[:2]
                         self.log_dict[key] = value
                     else:
                         self.log_other.append(x)
@@ -250,7 +282,7 @@ class File:
         # --------------------------------------------
         # NEW FORMAT (MSB)
         # --------------------------------------------
-        elif self.fversn == b'\x4c':
+        elif self.fversn == b"\x4c":
             # new MSB 1st
             print("New MSB 1st, yet to be implemented")
             pass  # To be implemented
@@ -258,41 +290,46 @@ class File:
         # --------------------------------------------
         # OLD FORMAT
         # --------------------------------------------
-        elif self.fversn == b'\x4d':
+        elif self.fversn == b"\x4d":
             # old format
             # oxtype -> fxtype
             # oytype -> fytype
-            self.oftflgs, \
-                self.oversn, \
-                self.oexp, \
-                self.onpts, \
-                self.ofirst, \
-                self.olast, \
-                self.fxtype, \
-                self.fytype, \
-                self.oyear, \
-                self.omonth, \
-                self.oday, \
-                self.ohour, \
-                self.ominute, \
-                self.ores, \
-                self.opeakpt, \
-                self.onscans, \
-                self.ospare, \
-                self.ocmnt, \
-                self.ocatxt, \
-                self.osubh1 = struct.unpack(self.old_head_str.encode('utf8'),
-                                            content[:self.old_head_siz])
+            (
+                self.oftflgs,
+                self.oversn,
+                self.oexp,
+                self.onpts,
+                self.ofirst,
+                self.olast,
+                self.fxtype,
+                self.fytype,
+                self.oyear,
+                self.omonth,
+                self.oday,
+                self.ohour,
+                self.ominute,
+                self.ores,
+                self.opeakpt,
+                self.onscans,
+                self.ospare,
+                self.ocmnt,
+                self.ocatxt,
+                self.osubh1,
+            ) = struct.unpack(
+                self.old_head_str.encode("utf8"), content[: self.old_head_siz]
+            )
 
             # Flag bits (assuming same)
-            self.tsprec, \
-                self.tcgram, \
-                self.tmulti, \
-                self.trandm, \
-                self.tordrd, \
-                self.talabs, \
-                self.txyxys, \
-                self.txvals = flag_bits(self.oftflgs)[::-1]
+            (
+                self.tsprec,
+                self.tcgram,
+                self.tmulti,
+                self.trandm,
+                self.tordrd,
+                self.talabs,
+                self.txyxys,
+                self.txvals,
+            ) = flag_bits(self.oftflgs)[::-1]
 
             # fix data types
             self.oexp = int(self.oexp)
@@ -314,8 +351,8 @@ class File:
             self.onscans = int(self.onscans)
 
             # null terminated strings
-            self.ores = self.ores.split(b'\x00')[0]
-            self.ocmnt = self.ocmnt.split(b'\x00')[0]
+            self.ores = self.ores.split(b"\x00")[0]
+            self.ocmnt = self.ocmnt.split(b"\x00")[0]
 
             # can it have separate x values ?
             self.x = np.linspace(self.ofirst, self.olast, num=self.onpts)
@@ -329,38 +366,70 @@ class File:
             # for each subfile
             # in the old format we don't know how many subfiles to expect,
             # just looping till we run out
-            i = 0
             while True:
+                # stop if not enough bytes remain for a subheader
+                if sub_pos + self.subhead_siz > self.length:
+                    break
                 try:
-                    # read in subheader
-                    subhead_lst = read_subheader(content[sub_pos:sub_pos + self.subhead_siz])
-
-                    if subhead_lst[6] > 0:
-                        # default to subfile points, unless it is zero
-                        pts = subhead_lst[6]
-                    else:
-                        pts = self.onpts
-
-                    # figure out size of subheader
-                    dat_siz = (4 * pts)
-                    sub_end = sub_pos + self.subhead_siz + dat_siz
-
-                    # read into object, add to list
-                    # send it pts since we have already figured that out
-                    self.sub.append(subFileOld(
-                        content[sub_pos:sub_end], pts, self.oexp, self.txyxys))
-                    # update next subfile postion, and index
-                    sub_pos = sub_end
-
-                    i += 1
-                except:
-                    # zero indexed, set the total number of subfile
-                    self.fnsub = i + 1
+                    subhead_raw = content[sub_pos : sub_pos + self.subhead_siz]
+                    subhead_lst = read_subheader(subhead_raw)
+                except Exception:
+                    # cannot parse another subheader
                     break
 
+                if subhead_lst[6] > 0:
+                    pts = subhead_lst[6]
+                else:
+                    pts = self.onpts
+                if pts <= 0:
+                    # invalid points -> stop parsing further
+                    break
+
+                dat_siz = (
+                    4 * pts
+                )  # old format stores only y (no separate x here typically)
+                sub_end = sub_pos + self.subhead_siz + dat_siz
+                if sub_end > self.length:
+                    # truncated file; abort loop
+                    break
+
+                try:
+                    self.sub.append(
+                        subFileOld(
+                            content[sub_pos:sub_end], pts, self.oexp, self.txyxys
+                        )
+                    )
+                except Exception:
+                    # failed to build subfile; abort further parsing
+                    break
+                sub_pos = sub_end
+
+            # fallback: if no subfiles parsed, synthesize one from header + remainder
+            if len(self.sub) == 0:
+                remainder = content[self.old_head_siz :]
+                # prefer onpts, otherwise infer from byte length
+                pts_guess = self.onpts if self.onpts > 0 else len(remainder) // 4
+                if pts_guess > 0:
+                    y_bytes_needed = 4 * pts_guess
+                    if len(remainder) < y_bytes_needed:
+                        pts_guess = len(remainder) // 4
+                        y_bytes_needed = 4 * pts_guess
+                    if pts_guess > 0 and len(self.osubh1) == self.subhead_siz:
+                        synth_data = self.osubh1 + remainder[:y_bytes_needed]
+                        try:
+                            self.sub.append(
+                                subFileOld(
+                                    synth_data, pts_guess, self.oexp, self.txyxys
+                                )
+                            )
+                        except Exception:
+                            pass  # leave sub empty if synthesis also fails
+
+            self.fnsub = max(1, len(self.sub))
+
             # assuming it can't have separate x values
-            self.dat_fmt = 'gx-y'
-            print('{}({})'.format(self.dat_fmt, self.fnsub))
+            self.dat_fmt = "gx-y"
+            print("{}({})".format(self.dat_fmt, self.fnsub))
 
             self.fxtype = ord(self.fxtype)
             self.fytype = ord(self.fytype)
@@ -371,24 +440,30 @@ class File:
         # --------------------------------------------
         # SHIMADZU
         # --------------------------------------------
-        elif self.fversn == b'\xcf':
+        elif self.fversn == b"\xcf":
             print("Highly experimental format, may not work ")
             raw_data = content[10240:]  # data starts here (maybe every time)
             # spacing between y and x data is atleast 0 bytes
-            s_32 = chr(int('0', 2)) * 32
-            s_8 = chr(int('0', 2)) * 8  # zero double
+            s_32 = chr(int("0", 2)) * 32
+            s_8 = chr(int("0", 2)) * 8  # zero double
             dat_len = raw_data.find(s_32)
             for i in range(dat_len, len(raw_data), 8):
                 # find first non zero double
-                if raw_data[i:i + 8] != s_8:
+                if raw_data[i : i + 8] != s_8:
                     break
             dat_siz = int(dat_len / 8)
-            self.y = struct.unpack(('<' + dat_siz * 'd').encode('utf8'), raw_data[:dat_len])
-            self.x = struct.unpack(('<' + dat_siz * 'd').encode('utf8'), raw_data[i:i + dat_len])
+            self.y = struct.unpack(
+                ("<" + dat_siz * "d").encode("utf8"), raw_data[:dat_len]
+            )
+            self.x = struct.unpack(
+                ("<" + dat_siz * "d").encode("utf8"), raw_data[i : i + dat_len]
+            )
 
         else:
-            print("File type %s not supported yet. Please add issue. "
-                  % hex(ord(self.fversn)))
+            print(
+                "File type %s not supported yet. Please add issue. "
+                % hex(ord(self.fversn))
+            )
             self.content = content
 
     # ------------------------------------------------------------------------
@@ -403,36 +478,39 @@ class File:
         # --------------------------
         # units for x,z,w axes
         # --------------------------
-        fxtype_op = ["Arbitrary",
-                     "Wavenumber (cm-1)",
-                     "Micrometers (um)",
-                     "Nanometers (nm)",
-                     "Seconds ",
-                     "Minutes", "Hertz (Hz)",
-                     "Kilohertz (KHz)",
-                     "Megahertz (MHz) ",
-                     "Mass (M/z)",
-                     "Parts per million (PPM)",
-                     "Days",
-                     "Years",
-                     "Raman Shift (cm-1)",
-                     "eV",
-                     "XYZ text labels in fcatxt (old 0x4D version only)",
-                     "Diode Number",
-                     "Channel",
-                     "Degrees",
-                     "Temperature (F)",
-                     "Temperature (C)",
-                     "Temperature (K)",
-                     "Data Points",
-                     "Milliseconds (mSec)",
-                     "Microseconds (uSec) ",
-                     "Nanoseconds (nSec)",
-                     "Gigahertz (GHz)",
-                     "Centimeters (cm)",
-                     "Meters (m)",
-                     "Millimeters (mm)",
-                     "Hours"]
+        fxtype_op = [
+            "Arbitrary",
+            "Wavenumber (cm-1)",
+            "Micrometers (um)",
+            "Nanometers (nm)",
+            "Seconds ",
+            "Minutes",
+            "Hertz (Hz)",
+            "Kilohertz (KHz)",
+            "Megahertz (MHz) ",
+            "Mass (M/z)",
+            "Parts per million (PPM)",
+            "Days",
+            "Years",
+            "Raman Shift (cm-1)",
+            "eV",
+            "XYZ text labels in fcatxt (old 0x4D version only)",
+            "Diode Number",
+            "Channel",
+            "Degrees",
+            "Temperature (F)",
+            "Temperature (C)",
+            "Temperature (K)",
+            "Data Points",
+            "Milliseconds (mSec)",
+            "Microseconds (uSec) ",
+            "Nanoseconds (nSec)",
+            "Gigahertz (GHz)",
+            "Centimeters (cm)",
+            "Meters (m)",
+            "Millimeters (mm)",
+            "Hours",
+        ]
 
         if self.fxtype < 30:
             self.xlabel = fxtype_op[self.fxtype]
@@ -448,38 +526,42 @@ class File:
         # units y-axis
         # --------------------------
 
-        fytype_op = ["Arbitrary Intensity",
-                     "Interferogram",
-                     "Absorbance",
-                     "Kubelka-Munk",
-                     "Counts",
-                     "Volts",
-                     "Degrees",
-                     "Milliamps",
-                     "Millimeters",
-                     "Millivolts",
-                     "Log(1/R)",
-                     "Percent",
-                     "Intensity",
-                     "Relative Intensity",
-                     "Energy",
-                     "",
-                     "Decibel",
-                     "",
-                     "",
-                     "Temperature (F)",
-                     "Temperature (C)",
-                     "Temperature (K)",
-                     "Index of Refraction [N]",
-                     "Extinction Coeff. [K]",
-                     "Real",
-                     "Imaginary",
-                     "Complex"]
+        fytype_op = [
+            "Arbitrary Intensity",
+            "Interferogram",
+            "Absorbance",
+            "Kubelka-Munk",
+            "Counts",
+            "Volts",
+            "Degrees",
+            "Milliamps",
+            "Millimeters",
+            "Millivolts",
+            "Log(1/R)",
+            "Percent",
+            "Intensity",
+            "Relative Intensity",
+            "Energy",
+            "",
+            "Decibel",
+            "",
+            "",
+            "Temperature (F)",
+            "Temperature (C)",
+            "Temperature (K)",
+            "Index of Refraction [N]",
+            "Extinction Coeff. [K]",
+            "Real",
+            "Imaginary",
+            "Complex",
+        ]
 
-        fytype_op2 = ["Transmission",
-                      "Reflectance",
-                      "Arbitrary or Single Beam with Valley Peaks",
-                      "Emission"]
+        fytype_op2 = [
+            "Transmission",
+            "Reflectance",
+            "Arbitrary or Single Beam with Valley Peaks",
+            "Emission",
+        ]
 
         if self.fytype < 27:
             self.ylabel = fytype_op[self.fytype]
@@ -495,7 +577,7 @@ class File:
         # split it based on 00 string
         # format x, y, z
         if self.talabs:
-            ll = self.fcatxt.split(b'\x00')
+            ll = self.fcatxt.split(b"\x00")
             if len(ll) > 2:
                 # make sure there are enough items to extract from
                 xl, yl, zl = ll[:3]
@@ -509,30 +591,32 @@ class File:
                     self.zlabel = zl
 
     def set_exp_type(self):
-        """ Sets the experiment type """
+        """Sets the experiment type"""
 
-        fexper_op = ["General SPC",
-                     "Gas Chromatogram",
-                     "General Chromatogram",
-                     "HPLC Chromatogram",
-                     "FT-IR, FT-NIR, FT-Raman Spectrum or Igram",
-                     "NIR Spectrum",
-                     "UV-VIS Spectrum",
-                     "X-ray Diffraction Spectrum",
-                     "Mass Spectrum ",
-                     "NMR Spectrum or FID",
-                     "Raman Spectrum",
-                     "Fluorescence Spectrum",
-                     "Atomic Spectrum",
-                     "Chromatography Diode Array Spectra"]
+        fexper_op = [
+            "General SPC",
+            "Gas Chromatogram",
+            "General Chromatogram",
+            "HPLC Chromatogram",
+            "FT-IR, FT-NIR, FT-Raman Spectrum or Igram",
+            "NIR Spectrum",
+            "UV-VIS Spectrum",
+            "X-ray Diffraction Spectrum",
+            "Mass Spectrum ",
+            "NMR Spectrum or FID",
+            "Raman Spectrum",
+            "Fluorescence Spectrum",
+            "Atomic Spectrum",
+            "Chromatography Diode Array Spectra",
+        ]
 
         self.exp_type = fexper_op[self.fexper]
 
     # ------------------------------------------------------------------------
     # output
     # ------------------------------------------------------------------------
-    def data_txt(self, delimiter='\t', newline='\n'):
-        """ Returns x,y column data as a string variable, can be printed to
+    def data_txt(self, delimiter="\t", newline="\n"):
+        """Returns x,y column data as a string variable, can be printed to
         standard output or fed to text file.
 
         Arguments
@@ -548,62 +632,62 @@ class File:
 
         """
 
-        dat = ''
+        dat = ""
         if self.fnsub == 1:
-            if self.dat_fmt.endswith('-xy'):
+            if self.dat_fmt.endswith("-xy"):
                 x = self.sub[0].x
             else:
                 x = self.x
             y = self.sub[0].y
 
             for x1, y1 in zip(x, y):
-                dat += '{}{}{}{}'.format(x1, delimiter, y1, newline)
+                dat += "{}{}{}{}".format(x1, delimiter, y1, newline)
         else:
-            if not self.dat_fmt.endswith('-xy'):
+            if not self.dat_fmt.endswith("-xy"):
                 # does not have separate x data
                 for i in range(len(self.x)):
-                    dat += '{}'.format(self.x[i])
+                    dat += "{}".format(self.x[i])
                     for s in self.sub:
-                        dat += '{}{}'.format(delimiter, s.y[i])
+                        dat += "{}{}".format(delimiter, s.y[i])
                     dat += newline
             else:
                 # txyxy format, return one long xy file with subfiles
                 # separated by blank lines
                 for i in self.sub:
                     for x1, y1 in zip(i.x, i.y):
-                        dat += '{}{}{}{}'.format(x1, delimiter, y1, newline)
+                        dat += "{}{}{}{}".format(x1, delimiter, y1, newline)
                     dat += newline
         return dat
 
     # Writes out data to a stream (significantly faster than appending to a string)
-    def stream_data_txt(self, stream, delimiter='\t', newline='\n'):
+    def stream_data_txt(self, stream, delimiter="\t", newline="\n"):
         if self.fnsub == 1:
-            if self.dat_fmt.endswith('-xy'):
+            if self.dat_fmt.endswith("-xy"):
                 x = self.sub[0].x
             else:
                 x = self.x
             y = self.sub[0].y
 
             for x1, y1 in zip(x, y):
-                stream.write('{}{}{}{}'.format(x1, delimiter, y1, newline))
+                stream.write("{}{}{}{}".format(x1, delimiter, y1, newline))
         else:
-            if not self.dat_fmt.endswith('-xy'):
+            if not self.dat_fmt.endswith("-xy"):
                 # does not have separate x data
                 for i in range(len(self.x)):
-                    stream.write('{}'.format(self.x[i]))
+                    stream.write("{}".format(self.x[i]))
                     for s in self.sub:
-                        stream.write('{}{}'.format(delimiter, s.y[i]))
+                        stream.write("{}{}".format(delimiter, s.y[i]))
                     stream.write(newline)
             else:
                 # txyxy format, return one long xy file with subfiles
                 # separated by blank lines
                 for i in self.sub:
                     for x1, y1 in zip(i.x, i.y):
-                        stream.write('{}{}{}{}'.format(x1, delimiter, y1, newline))
+                        stream.write("{}{}{}{}".format(x1, delimiter, y1, newline))
                     stream.write(newline)
 
-    def write_file(self, path, delimiter='\t', newline='\n'):
-        """ Output x,y data to text file tab seperated
+    def write_file(self, path, delimiter="\t", newline="\n"):
+        """Output x,y data to text file tab seperated
 
         Arguments
         ---------
@@ -619,19 +703,27 @@ class File:
         >>> f.writefile('/Users/home/output.txt', delimiter=',')
 
         """
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             self.stream_data_txt(f, delimiter, newline)
 
     def print_metadata(self):
-        """ Print out select metadata"""
-        print("Scan: ", self.log_dict['Comment'], "\n",
-              float(self.log_dict['Start']), "to ",
-              float(self.log_dict['End']), "; ",
-              float(self.log_dict['Increment']), "cm-1;",
-              float(self.log_dict['Integration Time']), "s integration time")
+        """Print out select metadata"""
+        print(
+            "Scan: ",
+            self.log_dict["Comment"],
+            "\n",
+            float(self.log_dict["Start"]),
+            "to ",
+            float(self.log_dict["End"]),
+            "; ",
+            float(self.log_dict["Increment"]),
+            "cm-1;",
+            float(self.log_dict["Integration Time"]),
+            "s integration time",
+        )
 
     def plot(self):
-        """ Plots data, and use column headers, returns figure object plotted
+        """Plots data, and use column headers, returns figure object plotted
 
         Requires matplotlib installed
 
@@ -641,7 +733,8 @@ class File:
 
         """
         import matplotlib.pyplot as plt
-        if self.dat_fmt.endswith('-xy'):
+
+        if self.dat_fmt.endswith("-xy"):
             for s in self.sub:
                 plt.plot(s.x, s.y)
         else:
@@ -681,13 +774,13 @@ class File:
         if self.txvals:
             print("floating x-value array preceeds y's")
 
-        print('----\n')
+        print("----\n")
         # spc format version
-        if self.fversn == chr(0x4b):
+        if self.fversn == chr(0x4B):
             self.pr_versn = "new LSB 1st"
-        elif self.fversn == chr(0x4c):
+        elif self.fversn == chr(0x4C):
             self.pr_versn = "new MSB 1st"
-        elif self.fversn == chr(0x4d):
+        elif self.fversn == chr(0x4D):
             self.pr_versn = "old format"
         else:
             self.pr_versn = "unknown version"
