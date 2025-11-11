@@ -11,7 +11,7 @@ dependencies = [
 requires-python = ">=3.8"
 authors = [
     { name = "Rohan Isaac", email = "rohan_isaac@yahoo.com" },
-    { name = "Michael Adams", email = "gitlab@mmmad.de" }
+    { name = "Michael Adams", email = "github@mmmad.de" }
 ]
 description = "Module for reading, exploring and converting *.spc spectroscopic binary data in Python."
 
